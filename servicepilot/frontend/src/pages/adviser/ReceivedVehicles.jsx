@@ -13,7 +13,7 @@ const ADVISER_STATUSES = ['WDA', 'WIA', 'WCA', 'WFA'];
 const NEXT_STATUS = { WDA: 'WIA', WIA: 'WCA', WCA: 'WFA', WFA: 'WFA' };
 
 export default function ReceivedVehicles() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -54,7 +54,14 @@ export default function ReceivedVehicles() {
     if (!selectedVehicle) return;
     setUpdating(true);
     try {
-      await updateVehicleStatus(selectedVehicle.id, updateForm.status, user.uid, updateForm.remarks);
+      await updateVehicleStatus(selectedVehicle.id, {
+        status: updateForm.status,
+        subStatus: null,
+        remarks: updateForm.remarks,
+        updatedBy: userProfile?.name || user.email,
+        updatedByRole: 'service_adviser',
+        previousStatus: selectedVehicle.currentStatus,
+      });
       toast.success(`Status updated to ${updateForm.status}`);
       setShowUpdateModal(false);
     } catch (err) {
