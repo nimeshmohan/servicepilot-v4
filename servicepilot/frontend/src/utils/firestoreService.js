@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, updateDoc, getDoc, getDocs,
-  query, where, orderBy, onSnapshot, serverTimestamp,
+  query, where, onSnapshot, serverTimestamp,
   arrayUnion, setDoc, limit,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -22,8 +22,12 @@ export const updateUser = async (uid, data) => {
 };
 
 export const subscribeUsers = (callback) => {
-  const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  const q = query(collection(db, 'users'));
+  return onSnapshot(q, snap => {
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    callback(docs);
+  });
 };
 
 // ─── VEHICLES ────────────────────────────────────────────────────────────────
@@ -127,20 +131,32 @@ export const getVehicleById = async (id) => {
 };
 
 export const subscribeVehicles = (callback, filters = {}) => {
-  const constraints = [orderBy('createdAt', 'desc')];
-  if (filters.adviserId) constraints.unshift(where('adviserId', '==', filters.adviserId));
-  if (filters.status) constraints.unshift(where('currentStatus', '==', filters.status));
+  const constraints = [];
+  if (filters.adviserId) constraints.push(where('adviserId', '==', filters.adviserId));
+  if (filters.status) constraints.push(where('currentStatus', '==', filters.status));
   const q = query(collection(db, 'vehicles'), ...constraints);
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => {
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort client-side to avoid composite index requirement
+    docs.sort((a, b) => {
+      const aTime = a.createdAt?.seconds || 0;
+      const bTime = b.createdAt?.seconds || 0;
+      return bTime - aTime;
+    });
+    callback(docs);
+  });
 };
 
 export const subscribeVehicleHistory = (vehicleId, callback) => {
   const q = query(
     collection(db, 'vehicleStatusHistory'),
-    where('vehicleId', '==', vehicleId),
-    orderBy('timestamp', 'asc')
+    where('vehicleId', '==', vehicleId)
   );
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => {
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+    callback(docs);
+  });
 };
 
 // ─── PARTS TRACKING ──────────────────────────────────────────────────────────
@@ -151,8 +167,12 @@ export const getPartsTracking = async (vehicleId) => {
 };
 
 export const subscribePartsTracking = (callback) => {
-  const q = query(collection(db, 'partsTracking'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  const q = query(collection(db, 'partsTracking'));
+  return onSnapshot(q, snap => {
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    callback(docs);
+  });
 };
 
 export const updatePartsTracking = async (vehicleId, data, updatedBy) => {
@@ -186,10 +206,13 @@ export const subscribeNotifications = (userId, callback) => {
   const q = query(
     collection(db, 'notifications'),
     where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
     limit(20)
   );
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => {
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    callback(docs);
+  });
 };
 
 // ─── DASHBOARD STATS ─────────────────────────────────────────────────────────
